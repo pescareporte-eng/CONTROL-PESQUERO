@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: control-pesquero
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 1 --threads 4 --timeout 120 wsgi:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_EMAIL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_TOKEN_JSON_B64
+        sync: false
+      - key: GOOGLE_SPREADSHEET_ID
+        sync: false
+      - key: GOOGLE_DRIVE_ROOT_FOLDER_ID
+        sync: false
+      - key: GOOGLE_DRIVE_REPORTS_FOLDER_ID
+        sync: false
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: APP_TIMEZONE
+        value: America/Lima

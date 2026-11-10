@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block content %}
+<div class="row g-3">
+ <div class="col-12 col-xl-4"><div class="panel-card"><div class="panel-heading"><div><h3>Nueva embarcación</h3><p>Registra el catálogo maestro.</p></div><span class="panel-icon"><i class="bi bi-sailboat"></i></span></div>
+ <form id="vesselForm" class="app-form"><div class="mb-3"><label class="form-label">Código automático</label><input class="form-control" id="vesselNextCode" value="Asignando código..." readonly aria-describedby="vesselCodeHelp"><div class="form-text" id="vesselCodeHelp">El sistema asigna el siguiente código disponible; no necesitas escribirlo.</div></div><div class="mb-3"><label class="form-label">Nombre *</label><input class="form-control" name="nombre" maxlength="100" required placeholder="Nombre de embarcación"></div><div class="mb-3"><label class="form-label">Matrícula</label><input class="form-control" name="matricula" maxlength="40" placeholder="Opcional"></div><button class="btn btn-primary w-100" type="submit"><i class="bi bi-plus-lg"></i> Guardar embarcación</button></form>
+ </div></div>
+ <div class="col-12 col-xl-8"><div class="panel-card"><div class="panel-heading"><div><h3>Embarcaciones registradas</h3><p>El catálogo es compartido por pesca y hielo.</p></div><span class="count-pill" id="vesselCount">0 activas</span></div><div class="table-responsive"><table class="table app-table"><thead><tr><th>Código</th><th>Nombre</th><th>Matrícula</th><th>Estado</th><th class="text-end">Acción</th></tr></thead><tbody id="vesselsBody"><tr><td colspan="5" class="empty-cell">Cargando...</td></tr></tbody></table></div></div></div>
+</div>
+{% endblock %}

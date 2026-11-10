@@ -1,0 +1,47 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-intro"><div><h2 class="section-title">Valorización de pesca</h2><p class="section-subtitle">Las valorizaciones de toneladas y kilos se registran como operaciones independientes.</p></div></div>
+<div class="row g-3 mb-4">
+  <div class="col-12 col-xl-6">
+    <div class="panel-card h-100">
+      <div class="panel-heading"><div><h3>Valorización por TM</h3><p>Registra únicamente toneladas métricas. Tiene su propio precio, importe y saldo.</p></div><span class="panel-icon"><i class="bi bi-truck"></i></span></div>
+      <form id="valuationTmForm" class="app-form">
+        <input type="hidden" name="tipo_valorizacion" value="TM">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Desembarque con TM pendiente *</label><select class="form-select" name="ingreso_pesca_id" id="landingTmSelect" required><option value="">Selecciona un desembarque...</option></select><div class="form-hint" id="landingTmInfo">Solo aparecerán desembarques con toneladas pendientes.</div></div>
+          <div class="col-12 col-md-6"><label class="form-label">Fecha de valorización *</label><input class="form-control" type="date" name="fecha_valorizacion" required></div>
+          <div class="col-12 col-md-6"><label class="form-label">TM a valorizar *</label><input class="form-control" name="toneladas_valorizadas" inputmode="decimal" placeholder="0.000" required></div>
+          <div class="col-12"><label class="form-label">Precio por TM (S/) *</label><input class="form-control" name="precio_por_tm" inputmode="decimal" placeholder="0.00" required></div>
+          <div class="col-12"><label class="form-label">Observaciones</label><input class="form-control" name="observaciones" placeholder="Opcional"></div>
+          <div class="col-12"><div class="calculation-preview"><span>Importe de valorización TM</span><strong id="valuationTmPreview">S/ 0.00</strong></div></div>
+          <div class="col-12 d-flex justify-content-end"><button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle"></i> Guardar valorización TM</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="panel-card h-100">
+      <div class="panel-heading"><div><h3>Valorización por KG</h3><p>Registra únicamente kilos. Tiene su propio precio, importe y saldo.</p></div><span class="panel-icon"><i class="bi bi-box-seam"></i></span></div>
+      <form id="valuationKgForm" class="app-form">
+        <input type="hidden" name="tipo_valorizacion" value="KG">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Desembarque con KG pendientes *</label><select class="form-select" name="ingreso_pesca_id" id="landingKgSelect" required><option value="">Selecciona un desembarque...</option></select><div class="form-hint" id="landingKgInfo">Solo aparecerán desembarques con kilos pendientes.</div></div>
+          <div class="col-12 col-md-6"><label class="form-label">Fecha de valorización *</label><input class="form-control" type="date" name="fecha_valorizacion" required></div>
+          <div class="col-12 col-md-6"><label class="form-label">KG a valorizar *</label><input class="form-control" name="kilos_valorizados" inputmode="decimal" placeholder="0.000" required></div>
+          <div class="col-12"><label class="form-label">Precio por KG (S/) *</label><input class="form-control" name="precio_por_kg" inputmode="decimal" placeholder="0.00" required></div>
+          <div class="col-12"><label class="form-label">Observaciones</label><input class="form-control" name="observaciones" placeholder="Opcional"></div>
+          <div class="col-12"><div class="calculation-preview"><span>Importe de valorización KG</span><strong id="valuationKgPreview">S/ 0.00</strong></div></div>
+          <div class="col-12 d-flex justify-content-end"><button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle"></i> Guardar valorización KG</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="panel-card mb-4">
+  <div class="panel-heading flex-wrap"><div><h3>Historial de valorizaciones TM</h3><p>Solo operaciones registradas en toneladas métricas.</p></div><div class="filter-inline"><input id="valuationFrom" class="form-control form-control-sm" type="date" aria-label="Desde"><input id="valuationTo" class="form-control form-control-sm" type="date" aria-label="Hasta"><button id="valuationFilter" class="btn btn-outline-primary btn-sm">Filtrar ambos historiales</button></div></div>
+  <div class="table-responsive"><table class="table app-table"><thead><tr><th>Fecha</th><th>Embarcación</th><th>TM valorizadas</th><th>Precio/TM</th><th>Importe TM</th><th>Acción</th></tr></thead><tbody id="valuationTmBody"><tr><td colspan="6" class="empty-cell">Cargando...</td></tr></tbody><tfoot><tr><th colspan="4">TOTAL VALORIZADO TM</th><th id="valuationTmTotal">S/ 0.00</th><th></th></tr></tfoot></table></div>
+</div>
+<div class="panel-card">
+  <div class="panel-heading"><div><h3>Historial de valorizaciones KG</h3><p>Solo operaciones registradas en kilogramos.</p></div></div>
+  <div class="table-responsive"><table class="table app-table"><thead><tr><th>Fecha</th><th>Embarcación</th><th>KG valorizados</th><th>Precio/KG</th><th>Importe KG</th><th>Acción</th></tr></thead><tbody id="valuationKgBody"><tr><td colspan="6" class="empty-cell">Cargando...</td></tr></tbody><tfoot><tr><th colspan="4">TOTAL VALORIZADO KG</th><th id="valuationKgTotal">S/ 0.00</th><th></th></tr></tfoot></table></div>
+</div>
+{% endblock %}
