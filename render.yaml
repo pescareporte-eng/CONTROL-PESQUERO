@@ -17,6 +17,11 @@ services:
         sync: false
       - key: GOOGLE_REDIRECT_URI
         sync: false
+      - key: GOOGLE_APPS_SCRIPT_URL
+        sync: false
+      - key: GOOGLE_APPS_SCRIPT_SECRET
+        sync: false
+      # GOOGLE_TOKEN_JSON_B64 se conserva temporalmente para facilitar rollback.
       - key: GOOGLE_TOKEN_JSON_B64
         sync: false
       - key: GOOGLE_SPREADSHEET_ID

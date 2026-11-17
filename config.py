@@ -14,7 +14,9 @@ class Config:
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
     GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:5000/auth/callback")
 
-    GOOGLE_TOKEN_JSON_B64 = os.getenv("GOOGLE_TOKEN_JSON_B64", "")
+    # Conexión de datos/Drive mediante Apps Script ejecutado como el propietario.
+    GOOGLE_APPS_SCRIPT_URL = os.getenv("GOOGLE_APPS_SCRIPT_URL", "")
+    GOOGLE_APPS_SCRIPT_SECRET = os.getenv("GOOGLE_APPS_SCRIPT_SECRET", "")
     GOOGLE_SPREADSHEET_ID = os.getenv("GOOGLE_SPREADSHEET_ID", "")
     GOOGLE_DRIVE_ROOT_FOLDER_ID = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID", "")
     GOOGLE_DRIVE_REPORTS_FOLDER_ID = os.getenv("GOOGLE_DRIVE_REPORTS_FOLDER_ID", "")

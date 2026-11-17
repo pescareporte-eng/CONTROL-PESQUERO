@@ -1,5 +1,7 @@
 # CONTROL PESQUERO
 
+> **Nota de migración Apps Script (versión preparada):** para la conexión nueva con Google Sheets y Google Drive, sigue `README_MIGRACION_APPS_SCRIPT.md` y utiliza `google_apps_script/Code.gs`. No ejecutes `scripts/setup_google.py` durante esta migración: ese asistente crea una hoja y carpetas nuevas. Las instrucciones OAuth antiguas de este README describen la instalación original; el inicio de sesión del dashboard continúa usando OAuth, pero el acceso de datos pasa al puente Apps Script.
+
 Aplicación web responsive para controlar ingreso de pesca, valorización por tonelada métrica y despachos de hielo por embarcación. Utiliza Google Sheets como almacenamiento principal y Google Drive para guardar los reportes. La aplicación se ejecuta en Python/Flask y puede publicarse en Render.
 
 > **Estado del entregable:** proyecto inicial funcional en código, preparado para conectar con tu cuenta Google. No incluye credenciales ni está conectado a una cuenta real: esas conexiones se realizan siguiendo esta guía.
@@ -181,7 +183,9 @@ El script `setup_google.py` crea el `.env` local. Las principales variables son:
 | `GOOGLE_CLIENT_ID` | Identifica el cliente OAuth |
 | `GOOGLE_CLIENT_SECRET` | Secreto OAuth del servidor |
 | `GOOGLE_REDIRECT_URI` | Callback OAuth local o de Render |
-| `GOOGLE_TOKEN_JSON_B64` | Token de acceso a Sheets y Drive, codificado en Base64 |
+| `GOOGLE_TOKEN_JSON_B64` | Variable antigua de acceso a Sheets/Drive; queda solo para rollback temporal y ya no la usa el nuevo repositorio |
+| `GOOGLE_APPS_SCRIPT_URL` | URL `/exec` del puente privado de Google Apps Script |
+| `GOOGLE_APPS_SCRIPT_SECRET` | Secreto compartido con la propiedad `CP_API_SECRET` de Apps Script |
 | `GOOGLE_SPREADSHEET_ID` | Identificador de la hoja principal |
 | `GOOGLE_DRIVE_ROOT_FOLDER_ID` | Carpeta principal de Drive |
 | `GOOGLE_DRIVE_REPORTS_FOLDER_ID` | Carpeta donde se crean los reportes |

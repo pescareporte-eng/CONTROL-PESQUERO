@@ -1,24 +1,18 @@
-"""Repositorio Google Sheets + Drive. Google Sheets es el almacenamiento principal."""
+"""Repositorio de CONTROL-PESQUERO mediante Google Apps Script.
+
+Google Apps Script se ejecuta bajo la cuenta propietaria y realiza las
+operaciones en la hoja y las carpetas existentes de Google Drive. El servidor
+Flask solo conserva la URL de la Web App y un secreto compartido.
+"""
 from __future__ import annotations
 
 import base64
-import io
-import json
 import threading
 from datetime import datetime
 from typing import Any
 
+import requests
 from flask import current_app
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive.file",
-    "https://www.googleapis.com/auth/userinfo.email",
-]
 
 HEADERS: dict[str, list[str]] = {
     "EMBARCACIONES": ["id", "codigo", "nombre", "matricula", "estado", "fecha_creacion"],
@@ -29,123 +23,78 @@ HEADERS: dict[str, list[str]] = {
     "AUDITORIA": ["id", "fecha_hora", "usuario", "accion", "modulo", "registro_id", "detalle"],
 }
 
+
 class GoogleSheetsRepository:
+    """Mantiene la misma interfaz usada por las rutas, delegando a Apps Script."""
+
     _lock = threading.RLock()
 
-    def __init__(self, token_json_b64: str, spreadsheet_id: str, root_folder_id: str, reports_folder_id: str):
-        if not all([token_json_b64, spreadsheet_id, root_folder_id, reports_folder_id]):
-            raise RuntimeError("Falta configurar Google: token, hoja de cálculo o carpetas de Drive.")
-        token_info = json.loads(base64.b64decode(token_json_b64).decode("utf-8"))
-        self.credentials = Credentials.from_authorized_user_info(token_info, scopes=SCOPES)
-        if self.credentials.expired and self.credentials.refresh_token:
-            self.credentials.refresh(Request())
-        if not self.credentials.valid:
-            raise RuntimeError("La autorización de Google no es válida. Repite scripts/setup_google.py.")
-        self.sheets = build("sheets", "v4", credentials=self.credentials, cache_discovery=False)
-        self.drive = build("drive", "v3", credentials=self.credentials, cache_discovery=False)
-        self.spreadsheet_id = spreadsheet_id
-        self.root_folder_id = root_folder_id
-        self.reports_folder_id = reports_folder_id
-        # Amplía pestañas existentes con columnas nuevas sin mover ni borrar históricos.
-        self._ensure_schema_headers()
+    def __init__(
+        self,
+        apps_script_url: str,
+        apps_script_secret: str,
+        spreadsheet_id: str,
+        root_folder_id: str,
+        reports_folder_id: str,
+    ):
+        if not all([apps_script_url, apps_script_secret, spreadsheet_id, reports_folder_id]):
+            raise RuntimeError(
+                "Falta configurar Google: URL/secreto de Apps Script, hoja o carpeta de reportes."
+            )
+        self.apps_script_url = apps_script_url.strip()
+        self.apps_script_secret = apps_script_secret.strip()
+        self.spreadsheet_id = spreadsheet_id.strip()
+        self.root_folder_id = (root_folder_id or "").strip()
+        self.reports_folder_id = reports_folder_id.strip()
+        self.http = requests.Session()
 
-    @staticmethod
-    def _column_name(number: int) -> str:
-        result = ""
-        while number:
-            number, remainder = divmod(number - 1, 26)
-            result = chr(65 + remainder) + result
-        return result
+        # Comprueba únicamente la conectividad. No crea pestañas ni modifica
+        # encabezados al iniciar el servicio: el esquema existente se conserva.
+        self._call("ping")
 
-    def _read_headers(self, tab: str) -> list[str]:
-        result = self.sheets.spreadsheets().values().get(
-            spreadsheetId=self.spreadsheet_id,
-            range=self._range(tab, "1:1"),
-            valueRenderOption="FORMATTED_VALUE",
-        ).execute()
-        values = result.get("values", [])
-        return [str(value) for value in values[0]] if values else []
+    def _call(self, action: str, **params: Any) -> Any:
+        payload = {"secret": self.apps_script_secret, "action": action, **params}
+        try:
+            response = self.http.post(
+                self.apps_script_url,
+                json=payload,
+                timeout=(10, 110),
+                allow_redirects=True,
+            )
+            response.raise_for_status()
+            try:
+                result = response.json()
+            except ValueError as exc:
+                preview = (response.text or "")[:240].replace("\n", " ")
+                raise RuntimeError(
+                    f"Apps Script no devolvió JSON válido (HTTP {response.status_code}): {preview}"
+                ) from exc
+        except requests.RequestException as exc:
+            current_app.logger.exception("Fallo al conectar con Google Apps Script (%s)", action)
+            raise RuntimeError(
+                "No se pudo conectar con el servicio de Google. Revisa la URL de Apps Script y su despliegue."
+            ) from exc
 
-    def _ensure_schema_headers(self) -> None:
-        # Primero verifica qué pestañas existen. Google Sheets no permite leer
-        # un rango de una pestaña que todavía no fue creada (por ejemplo,
-        # GASTOS_ESTADIA en instalaciones anteriores).
-        spreadsheet = self.sheets.spreadsheets().get(
-            spreadsheetId=self.spreadsheet_id,
-            fields="sheets.properties.title",
-        ).execute()
-        existing_tabs = {
-            sheet.get("properties", {}).get("title", "")
-            for sheet in spreadsheet.get("sheets", [])
-        }
-        missing_tabs = [tab for tab in HEADERS if tab not in existing_tabs]
-        if missing_tabs:
-            self.sheets.spreadsheets().batchUpdate(
-                spreadsheetId=self.spreadsheet_id,
-                body={
-                    "requests": [
-                        {"addSheet": {"properties": {"title": tab}}}
-                        for tab in missing_tabs
-                    ]
-                },
-            ).execute()
-
-        # Completa encabezados faltantes al final de cada fila, sin borrar ni
-        # reordenar columnas o registros que ya existían.
-        for tab, required in HEADERS.items():
-            existing = self._read_headers(tab)
-            if not existing:
-                self.sheets.spreadsheets().values().update(
-                    spreadsheetId=self.spreadsheet_id,
-                    range=self._range(tab, "A1"),
-                    valueInputOption="RAW",
-                    body={"values": [required]},
-                ).execute()
-                continue
-            missing = [name for name in required if name not in existing]
-            if missing:
-                first_col = self._column_name(len(existing) + 1)
-                last_col = self._column_name(len(existing) + len(missing))
-                self.sheets.spreadsheets().values().update(
-                    spreadsheetId=self.spreadsheet_id,
-                    range=self._range(tab, f"{first_col}1:{last_col}1"),
-                    valueInputOption="RAW",
-                    body={"values": [missing]},
-                ).execute()
-
-    def _range(self, tab: str, suffix: str = "A:Z") -> str:
-        if tab not in HEADERS:
-            raise ValueError("Pestaña no permitida")
-        return f"'{tab}'!{suffix}"
+        if not isinstance(result, dict) or result.get("ok") is not True:
+            message = result.get("error", "Respuesta no válida del servicio de Google.") if isinstance(result, dict) else "Respuesta no válida del servicio de Google."
+            current_app.logger.error("Google Apps Script rechazó la operación %s: %s", action, message)
+            raise RuntimeError(str(message))
+        return result.get("data")
 
     def get_all(self, tab: str) -> list[dict[str, str]]:
+        if tab not in HEADERS:
+            raise ValueError("Pestaña no permitida")
         with self._lock:
-            result = self.sheets.spreadsheets().values().get(
-                spreadsheetId=self.spreadsheet_id,
-                range=self._range(tab),
-                valueRenderOption="FORMATTED_VALUE",
-            ).execute()
-        values = result.get("values", [])
-        if not values:
-            return []
-        headers = values[0]
-        rows = []
-        for raw in values[1:]:
-            padded = raw + [""] * (len(headers) - len(raw))
-            rows.append({headers[i]: str(padded[i]) for i in range(len(headers))})
-        return rows
+            data = self._call("get_all", tab=tab)
+        if not isinstance(data, list):
+            raise RuntimeError(f"Google devolvió datos no válidos para la pestaña {tab}.")
+        return data
 
     def append(self, tab: str, item: dict[str, Any]) -> None:
-        headers = self._read_headers(tab) or HEADERS[tab]
-        row = [str(item.get(key, "")) for key in headers]
+        if tab not in HEADERS:
+            raise ValueError("Pestaña no permitida")
         with self._lock:
-            self.sheets.spreadsheets().values().append(
-                spreadsheetId=self.spreadsheet_id,
-                range=self._range(tab),
-                valueInputOption="RAW",
-                insertDataOption="INSERT_ROWS",
-                body={"values": [row]},
-            ).execute()
+            self._call("append", tab=tab, item=item)
 
     def find(self, tab: str, record_id: str) -> tuple[int, dict[str, str]] | None:
         rows = self.get_all(tab)
@@ -155,22 +104,20 @@ class GoogleSheetsRepository:
         return None
 
     def update(self, tab: str, record_id: str, changes: dict[str, Any]) -> dict[str, str] | None:
+        if tab not in HEADERS:
+            raise ValueError("Pestaña no permitida")
         found = self.find(tab, record_id)
         if not found:
             return None
         row_number, old = found
-        headers = self._read_headers(tab) or HEADERS[tab]
-        old.update({k: str(v) for k, v in changes.items() if k in headers})
-        row = [old.get(key, "") for key in headers]
-        last_col = self._column_name(len(row))
         with self._lock:
-            self.sheets.spreadsheets().values().update(
-                spreadsheetId=self.spreadsheet_id,
-                range=self._range(tab, f"A{row_number}:{last_col}{row_number}"),
-                valueInputOption="RAW",
-                body={"values": [row]},
-            ).execute()
-        return old
+            updated = self._call(
+                "update_row",
+                tab=tab,
+                row_number=row_number,
+                changes={key: str(value) for key, value in changes.items()},
+            )
+        return updated if isinstance(updated, dict) else None
 
     def audit(self, user: str, action: str, module: str, record_id: str, detail: str = "") -> None:
         self.append("AUDITORIA", {
@@ -183,48 +130,47 @@ class GoogleSheetsRepository:
             "detalle": detail,
         })
 
-    def _find_or_create_folder(self, name: str, parent_id: str) -> str:
-        safe_name = name.replace("'", "\\'")
-        query = (
-            f"name = '{safe_name}' and mimeType = 'application/vnd.google-apps.folder' "
-            f"and '{parent_id}' in parents and trashed = false"
+    def upload_report(
+        self,
+        filename: str,
+        content: bytes,
+        mime_type: str,
+        year: str,
+        category: str,
+    ) -> dict[str, str]:
+        result = self._call(
+            "upload_report",
+            filename=filename,
+            mime_type=mime_type,
+            year=str(year),
+            category=category,
+            content_base64=base64.b64encode(content).decode("ascii"),
         )
-        result = self.drive.files().list(q=query, spaces="drive", fields="files(id,name)", pageSize=20).execute()
-        files = result.get("files", [])
-        if files:
-            return files[0]["id"]
-        created = self.drive.files().create(
-            body={"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]},
-            fields="id",
-        ).execute()
-        return created["id"]
-
-    def upload_report(self, filename: str, content: bytes, mime_type: str, year: str, category: str) -> dict[str, str]:
-        year_id = self._find_or_create_folder(str(year), self.reports_folder_id)
-        category_id = self._find_or_create_folder(category, year_id)
-        media = MediaIoBaseUpload(io.BytesIO(content), mimetype=mime_type, resumable=False)
-        result = self.drive.files().create(
-            body={"name": filename, "parents": [category_id]},
-            media_body=media,
-            fields="id,name,webViewLink",
-        ).execute()
-        return {"id": result.get("id", ""), "name": result.get("name", filename), "url": result.get("webViewLink", "")}
+        if not isinstance(result, dict) or not result.get("id"):
+            raise RuntimeError("Google no confirmó que el reporte se haya guardado en Drive.")
+        return {
+            "id": str(result.get("id", "")),
+            "name": str(result.get("name", filename)),
+            "url": str(result.get("url", "")),
+        }
 
 
 _repository_instance = None
 _repository_init_lock = threading.Lock()
 
+
 def get_repository() -> GoogleSheetsRepository:
-    # Un solo repositorio por proceso: conserva el access token renovado en memoria.
+    # Un solo cliente por proceso, igual que la implementación anterior.
     global _repository_instance
     if _repository_instance is None:
         with _repository_init_lock:
             if _repository_instance is None:
                 cfg = current_app.config
                 _repository_instance = GoogleSheetsRepository(
-                    cfg["GOOGLE_TOKEN_JSON_B64"],
+                    cfg["GOOGLE_APPS_SCRIPT_URL"],
+                    cfg["GOOGLE_APPS_SCRIPT_SECRET"],
                     cfg["GOOGLE_SPREADSHEET_ID"],
-                    cfg["GOOGLE_DRIVE_ROOT_FOLDER_ID"],
+                    cfg.get("GOOGLE_DRIVE_ROOT_FOLDER_ID", ""),
                     cfg["GOOGLE_DRIVE_REPORTS_FOLDER_ID"],
                 )
     return _repository_instance
